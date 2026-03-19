@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - role: string (required, ['admin', 'doctor', 'staff'])
+    //   - organizationId: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: patients
+    // Document ID: {patientId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required, size < 100)
+    //   - age: number (required, positive)
+    //   - gender: string (required, ['Male', 'Female', 'Other'])
+    //   - status: string (required, ['Stable', 'Critical', 'Recovering'])
+    //   - lastVisit: timestamp (required)
+    //   - condition: string (required, size < 500)
+    //   - email: string (required, email format)
+    //   - phone: string (required, size < 20)
+    //   - createdBy: string (required, UID)
+    //   - organizationId: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: patients/{patientId}/vitals
+    // Document ID: {vitalId}
+    // Fields:
+    //   - type: string (required, ['Heart Rate', 'Blood Pressure', 'Temperature', 'Oxygen Level'])
+    //   - value: string (required, size < 50)
+    //   - unit: string (required, size < 20)
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: patients/{patientId}/medicalHistory
+    // Document ID: {historyId}
+    // Fields:
+    //   - date: string (required)
+    //   - title: string (required, size < 200)
+    //   - doctor: string (required, size < 100)
+    //   - status: string (required, ['Completed', 'Pending', 'Reviewed'])
+    //   - description: string (optional, size < 1000)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: patients/{patientId}/clinicalNotes
+    // Document ID: {noteId}
+    // Fields:
+    //   - date: string (required)
+    //   - doctor: string (required, size < 100)
+    //   - content: string (required, size < 5000)
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: activities
+    // Document ID: {activityId}
+    // Fields:
+    //   - type: string (required)
+    //   - name: string (required)
+    //   - time: timestamp (required)
+    //   - userId: string (required, UID)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (request.auth.token.email == "mosanaved@gmail.com") ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
+    }
+
+    function isStaff() {
+      return isAuthenticated() && (
+        isAdmin() || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff']
+        )
+      );
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'organizationId', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'organizationId', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'doctor', 'staff'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidPatient(data) {
+      return hasRequiredFields(['name', 'age', 'gender', 'status', 'createdBy', 'organizationId', 'createdAt', 'updatedAt']) &&
+             data.name is string &&
+             data.age is number &&
+             data.gender in ['Male', 'Female', 'Other'] &&
+             data.status in ['Stable', 'Critical', 'Recovering'] &&
+             data.createdBy == request.auth.uid &&
+             data.organizationId is string &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidMedicalHistory(data) {
+      return hasRequiredFields(['date', 'title', 'doctor', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(['date', 'title', 'doctor', 'status', 'description', 'createdAt']) &&
+             data.date is string &&
+             data.title is string && data.title.size() < 200 &&
+             data.doctor is string && data.doctor.size() < 100 &&
+             data.status in ['Completed', 'Pending', 'Reviewed'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidClinicalNote(data) {
+      return hasRequiredFields(['date', 'doctor', 'content', 'timestamp']) &&
+             hasOnlyAllowedFields(['date', 'doctor', 'content', 'timestamp']) &&
+             data.date is string &&
+             data.doctor is string && data.doctor.size() < 100 &&
+             data.content is string && data.content.size() < 5000 &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidVital(data) {
+      return hasRequiredFields(['type', 'value', 'unit', 'timestamp']) &&
+             hasOnlyAllowedFields(['type', 'value', 'unit', 'timestamp']) &&
+             data.type in ['Heart Rate', 'Blood Pressure', 'Temperature', 'Oxygen Level'] &&
+             data.value is string && data.value.size() < 50 &&
+             data.unit is string && data.unit.size() < 20 &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidActivity(data) {
+      return hasRequiredFields(['type', 'name', 'time', 'userId']) &&
+             hasOnlyAllowedFields(['type', 'name', 'time', 'userId']) &&
+             data.userId == request.auth.uid &&
+             data.time is timestamp;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'staff' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /patients/{patientId} {
+      allow read: if isStaff();
+      allow create: if isAuthenticated() && isValidPatient(request.resource.data);
+      allow update: if isStaff() && isValidPatient(request.resource.data) && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin();
+
+      match /vitals/{vitalId} {
+        allow read: if isStaff();
+        allow create: if isStaff() && isValidVital(request.resource.data);
+      }
+
+      match /medicalHistory/{historyId} {
+        allow read: if isStaff();
+        allow create: if isStaff() && isValidMedicalHistory(request.resource.data);
+      }
+
+      match /clinicalNotes/{noteId} {
+        allow read: if isStaff();
+        allow create: if isStaff() && isValidClinicalNote(request.resource.data);
+      }
+    }
+
+    match /activities/{activityId} {
+      allow read: if isStaff();
+      allow create: if isAuthenticated() && isValidActivity(request.resource.data);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

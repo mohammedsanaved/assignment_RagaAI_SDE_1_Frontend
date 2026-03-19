@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Private user profile and settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "doctor", "staff"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Patient medical record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "status": { "type": "string", "enum": ["Stable", "Critical", "Recovering"] },
+        "lastVisit": { "type": "string", "format": "date-time" },
+        "condition": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "age", "gender", "status", "createdBy"]
+    },
+    "Vital": {
+      "title": "Vital",
+      "description": "Patient vital signs.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["Heart Rate", "Blood Pressure", "Temperature", "Oxygen Level"] },
+        "value": { "type": "string" },
+        "unit": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "value", "timestamp"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Log of recent activities in the system.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "name": { "type": "string" },
+        "time": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["type", "name", "time", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User private profile."
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Patient records."
+    },
+    "/patients/{patientId}/vitals/{vitalId}": {
+      "schema": "Vital",
+      "description": "Patient vitals history."
+    },
+    "/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "System activity logs."
+    }
+  }
+}

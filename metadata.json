@@ -1,0 +1,5 @@
+{
+  "name": "HealSync SaaS",
+  "description": "A production-grade B2B Healthcare SaaS platform for patient management and analytics.",
+  "requestFramePermissions": ["notifications"]
+}
