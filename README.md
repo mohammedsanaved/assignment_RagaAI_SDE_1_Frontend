@@ -40,14 +40,8 @@ src/
 ## 🔐 Firebase Setup
 
 To enable real Firebase Authentication:
+
 1. Accept the Firebase terms in the AI Studio UI.
 2. The `firebase-applet-config.json` will be automatically generated.
 3. Update `src/services/firebase.ts` to use the config.
 4. Replace mock login logic in `src/pages/Login.tsx` with Firebase Auth methods.
-
-### Initial Setup
-The first admin user must be promoted directly in the Firebase console.
-1. Log in to the application for the first time.
-2. Go to the Firestore database in the Firebase console.
-3. Locate your user document in the `users` collection.
-4. Set the `role` field to `'admin'`.
